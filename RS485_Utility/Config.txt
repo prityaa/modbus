@@ -1,0 +1,12 @@
+SlaveID=50
+FunctionID=3
+StartRegister=30000
+NumberOfRegister=26
+Port=3
+Baudrate=9600
+Parity 0-none,1-odd,2-even=0
+Databits=8
+Stopbits=1
+Flowcontrol=0
+Delay=500
+Query Interval=500

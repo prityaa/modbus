@@ -1,0 +1,366 @@
+
+/**========================================================
+	*  INVENDIS TECHNOLOGY
+	*  Utility to ENATEL mains monitor controller 
+	*  based on Modbus TCP protocol.
+	*  More info, Kindly read readme file.
+==========================================================*/
+
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <sys/time.h>
+#include <netinet/in.h>
+#include <string.h>
+#include "../include/enatel_rectifier_utility.h"
+
+void os_sleep_in_us(unsigned int usec)
+{
+	struct timespec sl_time = { 0, 0 };
+
+#ifdef TESTING_WITH_PRINTF
+	dbg_printf("sleeping for %u usec\n", usec);
+#endif
+
+	sl_time.tv_sec = (usec)/1000000;
+	sl_time.tv_nsec = ((usec) % 1000000) * 1000;
+	nanosleep(&sl_time, NULL);
+}
+#define os_sleep_in_ms(x)	os_sleep_in_us(x*1000)
+
+void PrintHex(unsigned char *buf, int size)
+{
+	int i;
+	for (i=0; i < size; i++)
+		pr_debug("%02X ", buf[i]);
+		
+	pr_debug("\n");
+}
+
+void build_tcp_ip_modbus_command(unsigned char *tcp_iP_modbus_command, 
+							unsigned short slaveid, 
+							unsigned short functionid, 
+							unsigned short startreg, 
+							unsigned short numofreg, 
+							int command_num) 
+{
+	pr_debug("build_tcp_ip_modbus_command : command_num = %d, slaveid = %d,\
+				functionid = %d, startreg = %d, numofreg = %d\n",
+				command_num, slaveid, functionid, startreg, numofreg);	
+				
+	tcp_iP_modbus_command[5] = MODBUS_TCP_DATA_FIELD;
+	tcp_iP_modbus_command[6] = slaveid;
+	tcp_iP_modbus_command[7] = functionid;
+	tcp_iP_modbus_command[8] = (startreg >> 8) & 0xff;
+	tcp_iP_modbus_command[9] = startreg & 0xff;
+	tcp_iP_modbus_command[10] = (numofreg >> 8) & 0xff;
+	tcp_iP_modbus_command[11] = numofreg & 0xff;
+	PrintHex(tcp_iP_modbus_command, 12);
+}
+
+void display_enatel_mains_monitor_data(
+			const struct enatel_mains_rectifier_controller *s_rectifier_controller)
+{
+	char a;
+	int i = 0;
+	pr_debug("display_enatel_mains_monitor_data : printing all parameters\n");
+	
+	printf("Sr.No\tParameter\t\t\t\tValue\n");
+	printf(" 1 . \tBus Voltage 1 \t\t\t\t%f\n", s_rectifier_controller->bus_voltage);
+	printf(" 2 . \tNumber Of Rectifiers  \t\t\t%d\n", s_rectifier_controller->num_of_rectifiers);
+	printf(" 3 . \tRectifier Output Current  \t\t%d\n", s_rectifier_controller->rect_output_curr);
+	printf(" 4 . \tLoad Current  \t\t\t\t%d\n", s_rectifier_controller->load_curr);
+	printf(" 5 . \tBattery Current  \t\t\t%d\n", s_rectifier_controller->batt_curr);
+	printf(" 6 . \tBattery Capacity Remaining  \t\t%d\n", s_rectifier_controller->batt_capacity_remaining);
+	printf(" 7 . \tBattery Discharge Time Remaining  \t%d\n", s_rectifier_controller->battery_discharget_time_remaining);
+	printf(" 8 . \tBattery Temperature  \t\t\t%f\n", s_rectifier_controller->batt_temperature);
+	printf(" 9 . \tAmbient Temperature  \t\t\t%f\n", s_rectifier_controller->ambient_temperature);
+	printf("10 . \tNumber of 12V Converters  \t\t%d\n", s_rectifier_controller->num_of_12V_converters);
+	printf("11 . \t12V Converter Output Voltage  \t\t%f\n", s_rectifier_controller->_12V_converter_output_volt);
+	printf("12 . \t12V Converter Output Current  \t\t%d\n", s_rectifier_controller->_12V_converter_output_curr);
+	printf("13 . \tNumber of 24V Converters  \t\t%d\n", s_rectifier_controller->num_of_24V_converters);
+	printf("14 . \t24V Converter Output Voltage  \t\t%f\n", s_rectifier_controller->_24V_converter_output_volt);
+	printf("15 . \t24V Converter Output Current  \t\t%d\n", s_rectifier_controller->_24V_converter_output_curr);
+	printf("16 . \tNumber of 48V Converters  \t\t%d\n", s_rectifier_controller->num_of_48V_converters);
+	printf("17 . \t48V Converter Output Voltage  \t\t%f\n", s_rectifier_controller->_48V_converter_output_volt);
+	printf("18 . \t48V Converter Output Current  \t\t%d\n", s_rectifier_controller->_48V_converter_output_curr);
+	printf("19 . \tNumber of 60V Converters  \t\t%d\n", s_rectifier_controller->num_of_60V_converters);
+	printf("20 . \t60V Converter Output Voltage \t\t%f\n", s_rectifier_controller->_60V_converter_output_volt);
+	printf("21 . \t60V Converter Output Current  \t\t%d\n", s_rectifier_controller->_60V_converter_output_curr);
+	printf("22 . \tNumber of Inverters  \t\t\t%d\n", s_rectifier_controller->number_of_inverters);
+	printf("23 . \tInverter Output AC Voltage  \t\t%f\n", s_rectifier_controller->inverter_output_ac_volt);
+	printf("24 . \tInverter Output AC Current  \t\t%f\n", s_rectifier_controller->inverter_output_ac_curr);
+	printf("25 . \tFan Speed 1  \t\t\t\t%f\n", s_rectifier_controller->fan_speed_1);
+	printf("26 . \tFan Speed 2  \t\t\t\t%f\n", s_rectifier_controller->fan_speed_2);
+	for (; i < 16; i++)
+		printf("%d . \tCustom Variable %d  \t\t\t%d\n", i+27, i+1, s_rectifier_controller->custom_variable[i]);
+	
+	for (i = 0; i < 3; i++)
+		printf("%d . \tMains Monitor 1 AC Current %d \t\t%f\n", 43+i, i+1, s_rectifier_controller->mains_monitor_1_ac_voltage[i]);
+	for (i = 0; i < 3; i++)
+		printf("%d . \tMains Monitor 1 AC Voltage %d \t\t%f\n", 46+i, i+1, s_rectifier_controller->mains_monitor_1_ac_curr[i]);
+	printf("49 . \tMains Monitor 1 Frequency  \t\t%d\n",  s_rectifier_controller->mains_moninitor_1_frequency);
+	
+	for (i = 0; i < 3; i++)
+		printf("%d . \tMains Monitor 2 AC Voltage %d \t\t%f\n", 50+i, i+1, s_rectifier_controller->mains_monitor_2_ac_voltage[i]);
+	for (i = 0; i < 3; i++)
+		printf("%d . \tMains Monitor 2 AC Current %d \t\t%f\n", 53+i, i+1, s_rectifier_controller->mains_monitor_2_ac_curr[i]);
+	printf("54 . \tMains Monitor 2 Frequency  \t\t%d\n", s_rectifier_controller->mains_moninitor_2_frequency);
+	
+	printf("55 . \tFloat Voltage \t\t\t\t%f\n", s_rectifier_controller->float_voltage);
+	printf("56 . \tFast Charge Voltage \t\t\t%f\n", s_rectifier_controller->fast_charging_vol);
+	printf("57 . \tPeriodic Equalise Voltage \t\t%f\n", s_rectifier_controller->periodic_equilise_vol);
+	printf("58 . \tManual Equalise Voltage \t\t%f\n", s_rectifier_controller->manual_equilise_vol);
+	printf("59 . \tBattery Test Voltage \t\t\t%f\n", s_rectifier_controller->batt_test_volt);
+	
+	printf("\n\tNOTE : Value 32767 if sensor is not fitted or unassigned.\n");
+	printf("\n\tPress \"ENTER\" key to Continue to query\n\t");
+	getchar();
+}
+	
+void parse_enatel_mains_monitor_data(const unsigned char *ibuf, 
+						unsigned short numofreg, int command_num,
+						struct enatel_mains_rectifier_controller *s_rectifier_controller)
+{
+	pr_debug("parse_enatel_mains_monitor_data : numofreg = %d, command_num = %d\n", 
+			numofreg, command_num);
+	int buf_count = 0, reg_count = 0, i = 0, j = 0;
+	int data[numofreg/2];
+	memset(data, '\0', sizeof(data));
+	
+	for (buf_count = 9; buf_count < numofreg; buf_count++, reg_count++ ) {
+		data[reg_count] = ibuf[buf_count]<<8 | ibuf[++buf_count];
+		pr_debug("data[%d] = %d\n", reg_count, data[reg_count]);
+	}
+	
+	switch (command_num + 1) { 
+		case 1 :
+			s_rectifier_controller->bus_voltage = data[0] != 0x7fff ? data[0]/100 : data[0];
+			s_rectifier_controller->num_of_rectifiers= data[1];
+			s_rectifier_controller->rect_output_curr= data[2];
+			s_rectifier_controller->load_curr= data[3];
+			s_rectifier_controller->batt_curr = data[4];
+			s_rectifier_controller->batt_capacity_remaining = data[5];
+			s_rectifier_controller->battery_discharget_time_remaining = data[6];
+			s_rectifier_controller->batt_temperature = data[7] != 0x7fff ? data[7]/10 : data[7];
+			s_rectifier_controller->ambient_temperature = data[8] != 0x7fff ? data[8]/10 : data[8];
+			s_rectifier_controller->num_of_12V_converters = data[9];
+			s_rectifier_controller->_12V_converter_output_volt = data[10] != 0x7fff ? data[10]/100 : data[10];
+			s_rectifier_controller->_12V_converter_output_curr = data[11];
+			s_rectifier_controller->num_of_24V_converters = data[12];
+			s_rectifier_controller->_24V_converter_output_volt = data[13] != 0x7fff ? data[13]/100 : data[13];
+			s_rectifier_controller->_24V_converter_output_curr = data[14];
+			s_rectifier_controller->num_of_48V_converters = data[15];
+			s_rectifier_controller->_48V_converter_output_volt = data[16] != 0x7fff ? data[16]/100 : data[16];
+			s_rectifier_controller->_48V_converter_output_curr = data[17];
+			s_rectifier_controller->num_of_60V_converters = data[18];
+			s_rectifier_controller->_60V_converter_output_volt = data[19] != 0x7fff ? data[19]/100 : data[19];
+			s_rectifier_controller->_60V_converter_output_curr = data[20];
+			s_rectifier_controller->number_of_inverters = data[21];
+			s_rectifier_controller->inverter_output_ac_volt = data[22] != 0x7fff ? data[22]/10 : data[22];
+			s_rectifier_controller->inverter_output_ac_curr = data[23] != 0x7fff ? data[23]/100 : data[23];
+			s_rectifier_controller->fan_speed_1 = data[24] != 0x7fff ? data[24]/10 : data[24];
+			s_rectifier_controller->fan_speed_2 = data[25] != 0x7fff ? data[25]/10 : data[25];
+			
+			
+			for (reg_count = 26, i = 0 ; i < 16; i++, reg_count++)
+				s_rectifier_controller->custom_variable[i] = data[reg_count];
+				
+			break;
+		
+		case 2 :
+			for (i = 0, reg_count = 0; i < 3; i++)
+				s_rectifier_controller->mains_monitor_1_ac_voltage[i] = 
+							data[reg_count] != 0x7fff ? data[reg_count++]/10 : data[reg_count++];
+			
+			for (i = 0; i < 3; i++)	
+				s_rectifier_controller->mains_monitor_1_ac_curr[i] = 
+							data[reg_count] != 0x7fff ? data[reg_count++]/10 : data[reg_count++];
+			
+			s_rectifier_controller->mains_moninitor_1_frequency = data[reg_count++];
+			
+			for (i = 0; i < 3; i++)	
+				s_rectifier_controller->mains_monitor_2_ac_voltage[i] = 
+							data[reg_count] != 0x7fff ? data[reg_count++]/10 : data[reg_count++];
+				
+			for (i = 0; i < 3; i++)	
+				s_rectifier_controller->mains_monitor_2_ac_curr[i] = 
+							data[reg_count] != 0x7fff ? data[reg_count++]/10 : data[reg_count++];
+			
+			s_rectifier_controller->mains_moninitor_2_frequency = data[reg_count++];
+			break; 
+		
+		case 3:		
+			s_rectifier_controller->float_voltage = data[0] != 0x7fff ? data[0]/100 : data[0];
+			s_rectifier_controller->fast_charging_vol = data[1] != 0x7fff ?data[1]/100 : data[1];
+			s_rectifier_controller->periodic_equilise_vol = data[2] != 0x7fff ? data[2]/100 : data[2];
+			s_rectifier_controller->manual_equilise_vol = data[3] != 0x7fff ?data[3]/100: data [3];
+			s_rectifier_controller->batt_test_volt = data[4] != 0x7fff ? data[4]/100 : data[4];
+			break;
+	}
+}
+
+int main(int argc, char **argv)
+{
+	int s;
+	int i, command_num = 0, ret = 0;
+	struct sockaddr_in server;
+	fd_set fds;
+	struct timeval tv;
+	unsigned char tcp_iP_modbus_command[15];
+	unsigned char ibuf[1024];
+
+	unsigned char data[1024];
+	char *temp = NULL;
+	unsigned short 	slaveid, functionid = 3, 
+					startreg[] = {1, 101, 201}, 
+					numofreg[] = {42, 15, 5}, 
+					LengthField = 6, delay, queryint;
+	unsigned char IPAddress[20];
+	struct enatel_mains_rectifier_controller s_rectifier_controller;
+
+	const char *filename = "Config.txt";
+	
+	FILE *fp = NULL;
+
+	memset( data,'\0',1024);
+	
+#if RESET
+	system("reset");
+	printf("\n\n\t\t\tINVENDIS TECHNOLOGY\n\n");
+#endif
+	
+	fp = fopen( filename, "r");
+	if ( fp == NULL) {
+		printf("KINDLY PUT THE Config.txt FILE IN THE CURRENT DIRECTORY AND RESTART THE APPLICATION\n\n");
+		return -1;
+		
+	} else {
+		printf ("\n\n\t------File %s Opened Succesfully------\n\n", filename);
+		memset(data,0,sizeof(data));
+		fgets(data,sizeof(data), fp);
+		if ( (temp = strchr ( data , '=' )) != NULL ) {
+			temp++ ;
+			slaveid = atoi(temp);
+		}
+
+		memset(data,0,sizeof(data));
+		fgets(data,sizeof(data), fp); 
+		if ( (temp = strchr ( data , '=' )) != NULL ) {
+			temp++ ;
+			functionid  = atoi(temp);
+		}
+
+		memset(data,0,sizeof(data));
+		fgets(data,sizeof(data), fp);
+		if ( (temp = strchr ( data , '=' )) != NULL ) {
+			temp++ ;
+			strcpy(IPAddress, temp);
+		}
+
+		memset(data,0,sizeof(data));
+		fgets(data,sizeof(data), fp);
+		if ( (temp = strchr ( data , '=' )) != NULL ) {
+			temp++ ;
+			delay  = atoi(temp);
+		}
+
+		memset(data,'\0',sizeof(data));
+		fgets(data,sizeof(data), fp);
+		if ( (temp = strchr ( data , '=' )) != NULL ) {
+			temp++ ;
+			queryint  = atoi(temp);
+		}
+
+		fclose (fp);
+	}
+
+	printf("\tslaveid=%d\n \tfunctionid=%d\n \tdelay=%d\n \tqueryint=%d\n \tIPAddress = %s\n", 
+			slaveid, functionid, delay, queryint, IPAddress);
+	os_sleep_in_ms(10*queryint);
+	
+	while(1) {
+		for (command_num = 0; command_num <  COMMANDS_NUMS; command_num++) {
+			pr_debug("querrying command_num = %d : startreg[%d] =%d, numofreg[%d]= %d\n", 
+									command_num, command_num , startreg[command_num], 
+									command_num, numofreg[command_num]);
+			
+			memset(tcp_iP_modbus_command, '\0', sizeof(tcp_iP_modbus_command));
+			build_tcp_ip_modbus_command(tcp_iP_modbus_command, slaveid, functionid, 
+								BASE_REG_ADDRESS+startreg[command_num]-1, 
+								numofreg[command_num], 
+								command_num);
+			
+			/* establish connection to gateway on ASA standard port 502 */
+			s = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+			server.sin_family = AF_INET;
+			server.sin_port = htons(MODBUS_TCP_SRANDARD_PORT); /* ASA standard port */
+			server.sin_addr.s_addr = inet_addr(IPAddress);
+
+			if ( connect(s, (struct sockaddr *)&server, sizeof(struct sockaddr_in)) < 0) {
+				perror("send");
+				close(s);
+				return -1;
+			}
+
+			FD_ZERO(&fds);
+			tv.tv_sec = delay;
+			tv.tv_usec = 0;
+
+			/* check ready to send */
+			FD_SET(s, &fds);
+
+			if (select(s+1, NULL, &fds, NULL, &tv) <= 0) {
+				perror("select");
+				close(s);
+				return -2;
+			}
+
+			/* send request */
+			if (send(s, tcp_iP_modbus_command, 12, 0) < 12)
+				perror("send");
+			
+			/* wait for response */
+			FD_SET(s, &fds);
+			i = select(s+1, &fds, NULL, NULL, &tv);
+			if (i<=0) {
+				printf("no TCP response received\n");
+				close(s);
+				return -1;
+			}
+
+			/* receive and analyze response */
+			i = recv(s, ibuf, 1024, 0);
+			pr_debug("printing recieved data from contoller : \n");
+			PrintHex(ibuf, i);
+				
+			if (i < 9) {
+				if (i==0)
+					printf("unexpected close of connection at remote end\n");
+				else
+					printf("response was too short - %d chars\n", i);
+				
+			} else if (ibuf[7] & 0x80) {
+				printf("MODBUS exception response - type %d\n", ibuf[8]);
+					
+			} else if (i != (9+2*numofreg[command_num])) {
+				printf("incorrect response size is %d expected %d\n",
+						i, (9+2*numofreg[command_num]));
+				
+			} else { 
+				parse_enatel_mains_monitor_data(ibuf, i, command_num, &s_rectifier_controller);
+			
+			}
+			/* close connection */
+			close(s);
+		}
+#if RESET
+		system("reset");
+		printf("\n\n\t\t\tINVENDIS TECHNOLOGY\n");
+#endif			
+		display_enatel_mains_monitor_data(&s_rectifier_controller);
+		memset(&s_rectifier_controller, '\0', sizeof(s_rectifier_controller));
+		os_sleep_in_ms(queryint);
+	}
+}

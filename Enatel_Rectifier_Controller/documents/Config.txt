@@ -1,0 +1,4 @@
+SlaveID=0
+IPAddress=10.1.1.102
+Delay=5
+Query Interval=500

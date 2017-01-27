@@ -1,0 +1,36 @@
+	*  INVENDIS TECHNOLOGY
+	*  Utility to ENATEL mains monitor controller 
+	   based on Modbus TCP protocol.
+
+	* Author : Pritam
+========================================================================
+# Compilation
+========================================================================
+	# isense : 
+		make CROSS_COMPILE=arm-linux-uclibcgnueabi-
+		make CROSS_COMPILE=arm-linux-uclibcgnueabi- debug
+		
+	# linux PC
+		make 
+		make debug
+	
+========================================================================
+# TCP/IP MODBUS Error return code 
+========================================================================
+	=> TCP/IP MODBUS exception response - type 
+		2 == functions are supported but have no currently 
+				defined addresses available so will always
+				return the Illegal Data Address exception code.
+		
+		3 == reg not implemented.
+
+========================================================================
+# Execution
+========================================================================
+	- slave id not required 
+	- internally querriyng 3 command 
+		1 . reg 40001 - 40042
+		2 . reg 40101 - 40114
+		3 . reg 40201 - 40205 
+	
+NOTE : Reg Value 32767, if sensor is not fitted or unassigned.

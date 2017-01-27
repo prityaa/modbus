@@ -1,0 +1,9 @@
+SlaveID=1
+FunctionID=2
+StartRegister=100
+NumberOfRegister=176
+IPAddress=10.1.1.248
+LengthField=6
+RegisterAddress=10000
+Delay=5
+Query Interval=500
